@@ -6,7 +6,7 @@ sys.path.insert(0, r"C:\Users\delga\Documents\VISION\Compression_Algorithms")
 
 from src.logic.tools       import process_and_binarize
 from src.logic.chain_codes import chain_f4, chain_f8, chain_vcc, chain_3ot
-from src.transforms.Burrow_moveto import bwt, ibwt
+from src.transforms.Burrow_wheeler import bwt, ibwt
 
 IMG_PATH = r"C:\Users\delga\Documents\VISION\ShapeMetrics-Interface\tests\data\apple8.gif"
 
