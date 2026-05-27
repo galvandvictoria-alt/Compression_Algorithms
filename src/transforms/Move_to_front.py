@@ -101,9 +101,18 @@ def move_to_front_transform(cadena: list, chain_type: str = "F4", max_iter: int 
         mejor_H      : entropía de la mejor salida.
     """
     # Alfabeto inicial según el tipo de chain code
-    L0     = list(ALFABETOS.get(chain_type.upper(), sorted(set(cadena))))
+    base = ALFABETOS.get(chain_type.upper(), None)
+    simbolos_reales = sorted(set(cadena))
+    #L0     = list(ALFABETOS.get(chain_type.upper(), sorted(set(cadena))))
+    
+    if base and all(s in base for s in simbolos_reales):
+        L0 = list(base)
+    else:
+        L0 = simbolos_reales
+    
     L_size = len(L0)
     Ln     = list(range(L_size))  # alfabeto para pasos 2, 3, 4...
+
 
     mejor_salida = list(cadena)
     mejor_n      = 0
@@ -122,7 +131,7 @@ def move_to_front_transform(cadena: list, chain_type: str = "F4", max_iter: int 
     return mejor_salida, mejor_n, mejor_H  # ← estaba fuera del for, corregido
 
 
-def inverse_move_to_front_transform(indices: list, n: int, chain_type: str = "F4") -> list:
+def inverse_move_to_front_transform(indices: list, n: int, chain_type: str = "F4", L0_override: list = None) -> list:
     """
     Deshace exactamente n pasos de MTFT en orden inverso.
 
@@ -140,7 +149,13 @@ def inverse_move_to_front_transform(indices: list, n: int, chain_type: str = "F4
     Returns:
         Cadena original reconstruida.
     """
-    L0     = list(ALFABETOS.get(chain_type.upper(), sorted(set(indices))))
+    if L0_override is not None:
+        L0 = L0_override
+    else:
+        base = ALFABETOS.get(chain_type.upper(), None)
+        L0 = list(base) if base else sorted(set(indices))
+
+    #L0     = list(ALFABETOS.get(chain_type.upper(), sorted(set(indices))))
     L_size = len(L0)
     Ln     = list(range(L_size))
 

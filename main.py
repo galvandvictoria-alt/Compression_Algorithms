@@ -7,7 +7,7 @@ sys.path.insert(0, r"C:\Users\delga\Documents\VISION\Compression_Algorithms")
 from src.logic.tools       import process_and_binarize
 from src.logic.chain_codes import chain_f4, chain_f8, chain_vcc, chain_3ot
 from src.transforms.Burrow_wheeler import bwt, ibwt
-from src.transforms.Move_to_front import move_to_front_transform, inverse_move_to_front_transform
+from src.transforms.Move_to_front import move_to_front_transform, inverse_move_to_front_transform,  ALFABETOS
 
 from src.compression.compression_zip_huffman import (comprimir_huffman, descomprimir_huffman,
                                                      comprimir_zip, descomprimir_zip,
@@ -47,9 +47,14 @@ for nombre, cadena in cadenas.items():
     print(f"Round-trip   : {ok}\n")
 
     # MTFT
-    ctype = nombre
-    MZ, n, H_out = move_to_front_transform(B, chain_type=ctype)
-    rec_mtft = inverse_move_to_front_transform(MZ, n, chain_type=ctype)
+    base  = ALFABETOS.get(nombre.upper(), None)
+    simbolos_en_B = sorted(set(B))
+    L0_usado = list(base) if (base and all(s in base for s in simbolos_en_B))  else simbolos_en_B
+    
+    #ctype = nombre
+    MZ, n, H_out = move_to_front_transform(B, chain_type=nombre)
+    rec_mtft = inverse_move_to_front_transform(MZ, n, L0_override=L0_usado)
+
 
     #verificacion
     ok_mtft = "lossless" if rec_mtft == B else "ERROR "
@@ -75,7 +80,7 @@ for nombre, cadena in cadenas.items():
         rec = fn_d(datos, info)
 
         #Descompresión total y verificación vs el chain code original
-        rec_bwt_total = ibwt(inverse_move_to_front_transform(rec, n, chain_type=ctype), index)  
+        rec_bwt_total = ibwt(inverse_move_to_front_transform(rec, n, L0_override=L0_usado), index)  
         ok = "lossless" if rec_bwt_total == cadena else "ERROR "
 
         ratio = len(datos) / tam_original 

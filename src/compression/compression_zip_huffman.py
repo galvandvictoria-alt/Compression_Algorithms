@@ -142,38 +142,50 @@ def comprimir_aritmetico(cadena: list) -> tuple[bytes, dict]:
     # Probabilidades acumuladas exactas
     cum_low:  dict = {}
     cum_high: dict = {}
-    acum = Fraction(0)
+    acum = 0
     for s in simbolos:
         cum_low[s]  = acum
-        acum       += Fraction(conteo[s], total)
+        acum       += conteo[s]
         cum_high[s] = acum
 
-    # Codificación
-    low      = Fraction(0)
-    high     = Fraction(1)
-    MITAD    = Fraction(1, 2)
+    PREC = 60
+    SCALE = 1 << PREC
+    HALF = SCALE >> 1
+    QRTR = SCALE >> 2
+
+    low, high = 0, SCALE
+    pendiente = 0
     bits_out: list[int] = []
+
+    def emitir(bit):
+        nonlocal pendiente
+        bits_out.append(bit)
+        for _ in range(pendiente):
+            bits_out.append(1 - bit)
+        pendiente = 0
 
     for s in cadena:
         rango = high - low
-        high  = low + rango * cum_high[s]
-        low   = low + rango * cum_low[s]
+        new_high = low + rango * cum_high[s] // total
+        new_low = low + rango * cum_low[s] // total
+        if new_high <= new_low:
+            new_high = new_low + 1
+        high, low = new_high, new_low
 
         while True:
-            if high <= MITAD:
-                bits_out.append(0)
-                low  = low  * 2
-                high = high * 2
-            elif low >= MITAD:
-                bits_out.append(1)
-                low  = (low  - MITAD) * 2
-                high = (high - MITAD) * 2
+            if high <= HALF:
+                emitir(0) ; low <<= 1 ; high <<= 1
+            elif low >= HALF:
+                emitir(1) ; low = (low - HALF) << 1 ; high = (high - HALF) << 1
+            elif low >= QRTR and high <= 3 * QRTR:
+                pendiente += 1 ; low = (low - QRTR) << 1 ; high = (high - QRTR) << 1
             else:
                 break
+        
+    pendiente += 1  # Emitir bit final pendiente
+    emitir(0 if low < QRTR else 1)
 
-    # Bit final
-    bits_out.append(0 if low < MITAD else 1)
-    bits_out.append(1)  # bit extra para garantizar decodificación
+
 
     relleno  = (8 - len(bits_out) % 8) % 8
     n_bits   = len(bits_out)
@@ -185,9 +197,11 @@ def comprimir_aritmetico(cadena: list) -> tuple[bytes, dict]:
 
     info = {
         "simbolos": simbolos,
-        "cum_low":  {s: (v.numerator, v.denominator) for s, v in cum_low.items()},
-        "cum_high": {s: (v.numerator, v.denominator) for s, v in cum_high.items()},
+        "cum_low":  dict(cum_low),
+        "cum_high": dict(cum_high),
         "longitud": total,
+        "total":    total,
+        "PREC":     PREC,
         "relleno":  relleno,
         "n_bits":   n_bits,
     }
@@ -210,9 +224,13 @@ def descomprimir_aritmetico(datos: bytes, info: dict) -> list:
     longitud = info["longitud"]
     simbolos = info["simbolos"]
     n_bits   = info["n_bits"]
-    cum_low  = {s: Fraction(n, d) for s, (n, d) in info["cum_low"].items()}
-    cum_high = {s: Fraction(n, d) for s, (n, d) in info["cum_high"].items()}
-    MITAD    = Fraction(1, 2)
+    cum_low = info["cum_low"]
+    cum_high = info["cum_high"]
+    total = info["total"]
+    PREC = info["PREC"]
+    SCALE = 1 << PREC
+    HALF = SCALE >> 1
+    QRTR = SCALE >> 2
 
     # Bits disponibles
     bits = []
@@ -222,46 +240,51 @@ def descomprimir_aritmetico(datos: bytes, info: dict) -> list:
     bits = bits[:n_bits]
 
     # Valor inicial como fracción binaria
-    valor = Fraction(0)
-    for i, b in enumerate(bits):
-        if b:
-            valor += Fraction(1, 2 ** (i + 1))
-
-    low  = Fraction(0)
-    high = Fraction(1)
-    pos  = len(bits)
+    valor = 0
+    for i in range(PREC):
+        b = bits[i] if i < len(bits) else 0
+        valor = (valor << 1) | b
+    pos = PREC
+    
+    low, high = 0, SCALE
 
     cadena: list = []
     for _ in range(longitud):
-        rango    = high - low
-        relativo = (valor - low) / rango
-
+        rango = high - low
+        if rango == 0:
+            break
+        escala = ((valor - low + 1) * total - 1) // rango
+        escala = max(0, min(total - 1, escala))
+ 
         sym = simbolos[-1]
         for s in simbolos:
-            if cum_low[s] <= relativo < cum_high[s]:
+            if cum_low[s] <= escala < cum_high[s]:
                 sym = s
                 break
         cadena.append(sym)
-
-        high = low + rango * cum_high[sym]
-        low  = low + rango * cum_low[sym]
-
+ 
+        new_high = low + (rango * cum_high[sym]) // total
+        new_low  = low + (rango * cum_low[sym])  // total
+        if new_high <= new_low:
+            new_high = new_low + 1
+        high, low = new_high, new_low
+ 
         while True:
-            if high <= MITAD:
-                low   = low  * 2
-                high  = high * 2
-                b     = bits[pos] if pos < len(bits) else 0
-                valor = valor * 2 + Fraction(b, 2)
-                pos  += 1
-            elif low >= MITAD:
-                low   = (low  - MITAD) * 2
-                high  = (high - MITAD) * 2
-                b     = bits[pos] if pos < len(bits) else 0
-                valor = (valor - MITAD) * 2 + Fraction(b, 2)
-                pos  += 1
+            if high <= HALF:
+                low <<= 1; high <<= 1
+                b = bits[pos] if pos < len(bits) else 0
+                valor = (valor << 1) | b; pos += 1
+            elif low >= HALF:
+                low = (low - HALF) << 1; high = (high - HALF) << 1
+                b = bits[pos] if pos < len(bits) else 0
+                valor = ((valor - HALF) << 1) | b; pos += 1
+            elif low >= QRTR and high < 3 * QRTR:
+                low = (low - QRTR) << 1; high = (high - QRTR) << 1
+                b = bits[pos] if pos < len(bits) else 0
+                valor = ((valor - QRTR) << 1) | b; pos += 1
             else:
                 break
-
+ 
     return cadena
 #------------------------------------------------
 # ZIP WRAPPER SOBRE ZLIB Y HUFFMAN
