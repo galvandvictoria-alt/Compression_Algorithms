@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 # sys.path.insert(0, r"C:\Users\delga\Documents\VISION\Compression_Algorithms")
 
 from src.logic.tools import process_and_binarize
-from src.logic.chain_codes import chain_f4, chain_f8, chain_vcc, chain_3ot
+from src.logic.chain_codes import chain_f4, chain_f8, chain_vcc, chain_3ot, chain_af8
 from src.transforms.Burrow_wheeler import bwt, ibwt
 from src.transforms.Move_to_front import (
     move_to_front_transform,
@@ -70,6 +70,8 @@ def main():
     images = os.listdir(directorio_img)
     
     for image in images:
+        if image is not "apple8.gif":
+            pass
         # 1. Crear carpeta destino individual para la imagen actual
         nombre_base, _ = os.path.splitext(image)
         carpeta_destino = f"resultados/resultado_{nombre_base}"
@@ -93,6 +95,7 @@ def main():
                 "F8":  chain_f8(img),
                 "VCC": chain_vcc(img),
                 "3OT": chain_3ot(img),
+                "AF8": chain_af8(img)
             }
 
             resultados = {}
@@ -203,6 +206,7 @@ def main():
             reconstrucciones = [
                 ("F4",  cadenas.get("F4",  []), decode_f4_to_matrix),
                 ("F8",  cadenas.get("F8",  []), decode_f8_to_matrix),
+                ("AF8",  cadenas.get("AF8",  []), decode_af8_to_matrix),
                 ("VCC", cadenas.get("VCC", []), decode_vcc_to_matrix),
                 ("3OT", cadenas.get("3OT", []), lambda c: decode_3ot_to_matrix(c)[0]),
             ]
